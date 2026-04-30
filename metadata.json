@@ -1,0 +1,7 @@
+{
+  "name": "Remix: Vocal Studio Pro",
+  "description": "A free-to-use audio editor to record vocals over beats, with mixing and mastering capabilities.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
