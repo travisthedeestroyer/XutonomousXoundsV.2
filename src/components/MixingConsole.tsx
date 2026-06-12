@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings2, Mic, Music, Sparkles, ChevronRight, Layers, X, Activity, Waves, Flame, Volume2, SplitSquareHorizontal } from 'lucide-react';
-import { useStudioStore } from '../store/useStudioStore';
+import { useStudioStore } from '@/state/store';
+import { applyGenrePreset } from '@/audio';
 import { ProSlider } from './ui/ProSlider';
-import { applyGenrePreset } from '../lib/audioUtils';
 
+/** Manual mixing console — every MixSettings parameter exposed as a slider. */
 export function MixingConsole() {
   const {
     isMobile, isSmallMobile,
@@ -35,7 +36,7 @@ export function MixingConsole() {
             )}
           </div>
 
-          {/* Genre Preset Selector */}
+          {/* Genre presets */}
           <div className="bg-white/5 rounded-xl border border-white/10 p-3">
             <label className="text-[9px] font-bold uppercase tracking-widest text-white/40 mb-2 block">Genre Preset</label>
             <div className="grid grid-cols-4 gap-1">
@@ -51,7 +52,7 @@ export function MixingConsole() {
             </div>
           </div>
 
-          {/* Vocal Chain */}
+          {/* Vocal chain */}
           <details open className="group">
             <summary className="flex items-center gap-2 cursor-pointer select-none py-2 px-3 bg-violet-500/10 border border-violet-500/20 rounded-xl">
               <Mic className="w-3 h-3 text-violet-400" />
@@ -112,7 +113,7 @@ export function MixingConsole() {
             </div>
           </details>
 
-          {/* Beat Chain */}
+          {/* Beat chain */}
           <details className="group">
             <summary className="flex items-center gap-2 cursor-pointer select-none py-2 px-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
               <Music className="w-3 h-3 text-blue-400" />
@@ -134,7 +135,7 @@ export function MixingConsole() {
             </div>
           </details>
 
-          {/* Mastering Chain */}
+          {/* Mastering chain */}
           <details className="group">
             <summary className="flex items-center gap-2 cursor-pointer select-none py-2 px-3 bg-rose-500/10 border border-rose-500/20 rounded-xl">
               <Sparkles className="w-3 h-3 text-rose-400" />

@@ -13,22 +13,22 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Hide scrollbar for Chrome, Safari and Opera */
+/* Hide scrollbar (Chrome, Safari, Opera) */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
-/* Hide scrollbar for IE, Edge and Firefox */
+/* Hide scrollbar (IE, Edge, Firefox) */
 .no-scrollbar {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-/* Custom Range Input Reset for ProSlider */
+/* Custom range input reset for ProSlider */
 input[type=range] {
-  -webkit-appearance: none; /* Hides the slider so that custom slider can be made */
-  width: 100%; /* Specific width is required for Firefox. */
-  background: transparent; /* Otherwise white in Chrome */
+  -webkit-appearance: none;
+  width: 100%;
+  background: transparent;
   margin: 0;
   padding: 0;
 }
@@ -50,10 +50,10 @@ input[type=range]::-moz-range-thumb {
 }
 
 input[type=range]:focus {
-  outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
+  outline: none;
 }
 
-/* Orb Animations */
+/* Orb animations */
 @keyframes orb-morph {
   0% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
   50% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
@@ -67,7 +67,7 @@ input[type=range]:focus {
 
 .orb-fluid {
   animation: orb-morph 12s ease-in-out infinite, orb-pulse 8s ease-in-out infinite;
-  box-shadow: 
+  box-shadow:
     inset -20px -20px 60px rgba(0,0,0,0.8),
     inset 20px 20px 60px rgba(255,255,255,0.2),
     0 0 100px rgba(139, 92, 246, 0.5);

@@ -7,7 +7,6 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "allowJs": true,
     "resolveJsonModule": true
   },
   "include": ["server.ts"]

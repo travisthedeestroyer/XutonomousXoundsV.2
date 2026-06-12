@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Upload } from 'lucide-react';
-import { useStudioStore } from '../../store/useStudioStore';
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer';
+import { useStudioStore } from '@/state/store';
 import { FluidOrb } from '../FluidOrb';
 
+/** Step 1 — upload a beat (file picker or drag-drop) and detect its BPM. */
 export function UploadStep() {
   const {
     isSmallMobile,
@@ -17,15 +18,14 @@ export function UploadStep() {
   const [hovered, setHovered] = useState(false);
   const size = isSmallMobile ? 224 : 280;
 
-  const handleBeatUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const acceptBeatFile = async (file: File) => {
     if (beatUrl) URL.revokeObjectURL(beatUrl);
     setOriginalBeatBlob(file);
     setBeatBlob(file);
     setBeatUrl(URL.createObjectURL(file));
     setStep('prepare');
 
+    // BPM detection runs in the background while the user prepares the beat
     setIsAnalyzingBpm(true);
     let bpmCtx: AudioContext | null = null;
     try {
@@ -45,6 +45,18 @@ export function UploadStep() {
     }
   };
 
+  const handleBeatUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void acceptBeatFile(file);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setHovered(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('audio')) void acceptBeatFile(file);
+  };
+
   return (
     <motion.div
       key="upload"
@@ -58,6 +70,9 @@ export function UploadStep() {
         style={{ width: size, height: size }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onDragOver={(e) => { e.preventDefault(); setHovered(true); }}
+        onDragLeave={() => setHovered(false)}
+        onDrop={handleDrop}
       >
         <FluidOrb size={size} active={hovered} />
 

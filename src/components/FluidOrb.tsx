@@ -6,6 +6,7 @@ interface FluidOrbProps {
   active?: boolean;
 }
 
+/** Canvas-rendered fluid orb that reacts to an optional live analyser. */
 export function FluidOrb({ analyser, size = 280, active = false }: FluidOrbProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animRef = useRef<number | null>(null);
@@ -27,6 +28,7 @@ export function FluidOrb({ analyser, size = 280, active = false }: FluidOrbProps
       tick++;
       ctx.clearRect(0, 0, W, H);
 
+      // Audio energy (live or idle pulse)
       let energy = 0;
       if (analyser) {
         const data = new Uint8Array(analyser.frequencyBinCount);
@@ -53,11 +55,11 @@ export function FluidOrb({ analyser, size = 280, active = false }: FluidOrbProps
           const rr = ringR + noise;
           const x = cx + Math.cos(angle) * rr;
           const y = cy + Math.sin(angle) * rr;
-          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.closePath();
         const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, ringR + 20);
-        grad.addColorStop(0, `rgba(139,92,246,0)`);
+        grad.addColorStop(0, 'rgba(139,92,246,0)');
         grad.addColorStop(1, `rgba(139,92,246,${alpha})`);
         ctx.strokeStyle = grad;
         ctx.lineWidth = 1.5;
@@ -75,7 +77,7 @@ export function FluidOrb({ analyser, size = 280, active = false }: FluidOrbProps
         const rr = r + noise;
         const x = cx + Math.cos(angle) * rr;
         const y = cy + Math.sin(angle) * rr;
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       }
       ctx.closePath();
 

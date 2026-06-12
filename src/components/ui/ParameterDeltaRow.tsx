@@ -1,6 +1,7 @@
-import type { ParameterDelta } from '../../lib/aiMixer';
+import type { ParameterDelta } from '@/ai';
 
-function formatDeltaVal(val: number, unit: string): string {
+/** Format a delta value according to its unit. */
+export function formatDeltaVal(val: number, unit: string): string {
   if (unit === '%') return `${Math.round(val * 100)}%`;
   if (unit === 'dB' || unit === 'LUFS') return `${val.toFixed(1)}`;
   if (unit === 'Hz') return `${Math.round(val)}`;
@@ -8,6 +9,7 @@ function formatDeltaVal(val: number, unit: string): string {
   return `${val.toFixed(2)}`;
 }
 
+/** Before/after row for a single mix-parameter change. */
 export function ParameterDeltaRow({ delta }: { delta: ParameterDelta }) {
   const change = delta.after - delta.before;
   const isIncrease = change > 0;
@@ -32,5 +34,3 @@ export function ParameterDeltaRow({ delta }: { delta: ParameterDelta }) {
     </div>
   );
 }
-
-export { formatDeltaVal };

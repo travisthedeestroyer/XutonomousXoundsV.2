@@ -2,12 +2,13 @@ import { motion } from 'motion/react';
 import {
   FastForward, Activity, Loader2, SplitSquareHorizontal, Download, FileText, Wand2, RotateCcw,
 } from 'lucide-react';
-import { FluidOrb } from '../FluidOrb';
-import { useStudioStore } from '../../store/useStudioStore';
-import { ProSlider } from '../ui/ProSlider';
-import { processBeat } from '../../lib/audioUtils';
 import { GoogleGenAI } from '@google/genai';
+import { useStudioStore } from '@/state/store';
+import { processBeat } from '@/audio';
+import { FluidOrb } from '../FluidOrb';
+import { ProSlider } from '../ui/ProSlider';
 
+/** Step 2 — tweak speed/pitch, extract stems, write lyrics. */
 export function PrepareStep() {
   const {
     isMobile, isSmallMobile,
@@ -27,6 +28,7 @@ export function PrepareStep() {
     savedApiKey,
   } = useStudioStore();
 
+  // Render speed/pitch into the beat, then advance to recording
   const handlePrepareBeat = async () => {
     if (!originalBeatBlob) return;
     setIsProcessingBeat(true);
@@ -51,6 +53,7 @@ export function PrepareStep() {
     }
   };
 
+  // Server-side stem separation with SSE status stream
   const handleSeparateStems = async () => {
     if (!beatBlob) return;
     setIsSeparating(true);
@@ -64,7 +67,6 @@ export function PrepareStep() {
       const data = await res.json() as { jobId: string };
       setSeparationJobId(data.jobId);
 
-      // SSE for status
       const evtSource = new EventSource(`/api/separate/status-stream/${data.jobId}`);
       evtSource.onmessage = (e) => {
         const status = JSON.parse(e.data) as { status: string; stems?: string[] };
@@ -130,7 +132,7 @@ export function PrepareStep() {
         </button>
       </motion.div>
 
-      {/* Left panel: speed + pitch */}
+      {/* Left panel: BPM + speed (+ pitch on mobile) */}
       <motion.div
         initial={{ x: 0, y: 0, opacity: 0 }}
         animate={{ x: isMobile ? 0 : -280, y: isMobile ? (isSmallMobile ? -160 : -180) : 0, opacity: 1 }}

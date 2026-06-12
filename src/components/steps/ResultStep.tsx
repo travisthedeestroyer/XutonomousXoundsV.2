@@ -1,20 +1,24 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Download, Settings2, RotateCcw, Activity, Sparkles, History,
-  CheckCircle2, Upload, Layers, Loader2, TreePine, Star, X,
+  CheckCircle2, Upload, Layers, Loader2, TreePine, Star, X, FlipHorizontal2,
 } from 'lucide-react';
-import { useStudioStore } from '../../store/useStudioStore';
-import { crystallizeSkill, getSkillTreeStats } from '../../lib/agentMemory';
-import type { FullAudioAnalysis } from '../../lib/audioUtils';
+import { useStudioStore } from '@/state/store';
+import { crystallizeSkill, getSkillTreeStats } from '@/ai';
+import type { FullAudioAnalysis } from '@/audio';
 
 interface ResultStepProps {
   onMastering: () => void;
 }
 
+/** Step 5 — A/B playback, download, reference mastering, skill crystallization. */
 export function ResultStep({ onMastering }: ResultStepProps) {
+  const [showOriginal, setShowOriginal] = useState(false);
+
   const {
     isMobile, isSmallMobile,
-    mixedUrl, masteredUrl,
+    mixedUrl, masteredUrl, rawMixUrl,
     settings,
     aiReasoning,
     history,
@@ -48,8 +52,36 @@ export function ResultStep({ onMastering }: ResultStepProps) {
             <p className="text-[10px] uppercase tracking-widest text-white/40">High-fidelity export ready</p>
           </div>
 
-          <div className="w-full max-w-md bg-white/5 rounded-2xl p-4 border border-white/5">
-            <audio src={masteredUrl || mixedUrl} controls playsInline className="w-full h-10 outline-none opacity-90 invert hue-rotate-180 grayscale contrast-150" />
+          {/* A/B player: raw vs mixed/mastered */}
+          <div className="w-full max-w-md bg-white/5 rounded-2xl p-4 border border-white/5 flex flex-col gap-3">
+            {rawMixUrl && (
+              <div className="flex bg-black/40 rounded-xl p-1 border border-white/5">
+                <button
+                  onClick={() => setShowOriginal(false)}
+                  className={`flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 ${!showOriginal ? 'bg-white/10 text-white shadow-sm' : 'text-white/30 hover:text-white/50'}`}
+                >
+                  <Sparkles className="w-2.5 h-2.5" /> Mixed
+                </button>
+                <button
+                  onClick={() => setShowOriginal(true)}
+                  className={`flex-1 py-1.5 text-[9px] font-bold uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-1.5 ${showOriginal ? 'bg-white/10 text-white shadow-sm' : 'text-white/30 hover:text-white/50'}`}
+                >
+                  <FlipHorizontal2 className="w-2.5 h-2.5" /> Original
+                </button>
+              </div>
+            )}
+            <audio
+              key={showOriginal ? 'original' : 'mixed'}
+              src={showOriginal ? rawMixUrl! : (masteredUrl || mixedUrl)}
+              controls
+              playsInline
+              className="w-full h-10 outline-none opacity-90 invert hue-rotate-180 grayscale contrast-150"
+            />
+            {rawMixUrl && (
+              <p className="text-[8px] text-white/20 text-center uppercase tracking-widest">
+                {showOriginal ? 'Dry signal — no EQ, compression, or effects' : 'AI mixed & mastered output'}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
@@ -74,7 +106,7 @@ export function ResultStep({ onMastering }: ResultStepProps) {
               </div>
             </div>
 
-            {/* AI Notes */}
+            {/* AI notes */}
             <div className="bg-white/5 p-5 rounded-2xl border border-white/5 flex flex-col gap-4">
               <h3 className="text-[10px] font-bold uppercase tracking-widest text-white/40 flex items-center gap-2">
                 <Sparkles className="w-3 h-3" /> AI Notes
@@ -102,7 +134,7 @@ export function ResultStep({ onMastering }: ResultStepProps) {
             </div>
           </div>
 
-          {/* Skill Tree crystallization */}
+          {/* Skill tree crystallization */}
           {lastSessionResult && skillFeedbackState === 'pending' && (
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -191,7 +223,7 @@ export function ResultStep({ onMastering }: ResultStepProps) {
           </div>
         </motion.div>
 
-        {/* Reference Mastering Panel */}
+        {/* Reference mastering panel */}
         <motion.div
           initial={{ x: 100, opacity: 0 }}
           animate={{ x: isMobile ? 0 : 480, y: isMobile ? 320 : 0, opacity: 1 }}

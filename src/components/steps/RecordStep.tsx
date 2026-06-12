@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState } from 'react';
 import { motion } from 'motion/react';
 import { Mic, Square, Activity, FileText, Ear } from 'lucide-react';
-import { useStudioStore } from '../../store/useStudioStore';
+import { useStudioStore } from '@/state/store';
 import { FluidOrb } from '../FluidOrb';
 
 interface RecordStepProps {
@@ -9,6 +9,15 @@ interface RecordStepProps {
   onRecordingComplete: () => void;
 }
 
+// Live audio-graph nodes kept outside React state for the active take
+interface LiveSession {
+  ctx: AudioContext;
+  analyser: AnalyserNode;
+  beatSrc: AudioBufferSourceNode | null;
+  vocalSrc: AudioBufferSourceNode | null;
+}
+
+/** Step 3 — record main/backup vocal takes over the beat. */
 export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) {
   const {
     isMobile, isSmallMobile,
@@ -29,14 +38,14 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sessionRef = useRef<LiveSession | null>(null);
   const animationRef = useRef<number | null>(null);
   const metronomeRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Circular frequency visualizer drawn onto the shared canvas
   const drawVisualizer = useCallback(() => {
     const canvas = canvasRef.current;
-    const analyser = (audioCtxRef.current as unknown as { _analyser?: AnalyserNode })?._analyser;
+    const analyser = sessionRef.current?.analyser;
     if (!canvas || !analyser) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -73,22 +82,22 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
           autoGainControl: useEchoCancellation,
         },
       });
-      streamRef.current = stream;
 
       const AudioContextClass = (window as unknown as Record<string, unknown>).AudioContext as typeof AudioContext ||
         (window as unknown as Record<string, unknown>).webkitAudioContext as typeof AudioContext;
       const ctx = new AudioContextClass();
-      audioCtxRef.current = ctx;
       if (ctx.state === 'suspended') await ctx.resume();
 
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       source.connect(analyser);
-      (ctx as unknown as Record<string, unknown>)._analyser = analyser;
       setLiveAnalyser(analyser);
 
-      // Schedule beat using precise AudioContext timing (sample-accurate sync)
+      const session: LiveSession = { ctx, analyser, beatSrc: null, vocalSrc: null };
+      sessionRef.current = session;
+
+      // Schedule beat playback with sample-accurate AudioContext timing
       if (beatBuffer) {
         const beatSrc = ctx.createBufferSource();
         beatSrc.buffer = beatBuffer;
@@ -96,11 +105,11 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
         beatGain.gain.value = 0.8;
         beatSrc.connect(beatGain);
         beatGain.connect(ctx.destination);
-        beatSrc.start(ctx.currentTime); // sample-accurate start
-        (ctx as unknown as Record<string, unknown>)._beatSrc = beatSrc;
+        beatSrc.start(ctx.currentTime);
+        session.beatSrc = beatSrc;
       }
 
-      // Schedule backup vocal playback at the same time
+      // In backup mode, also play the main take for the singer to layer over
       if (recordingMode === 'backup' && mainVocalBuffer) {
         const vocalSrc = ctx.createBufferSource();
         vocalSrc.buffer = mainVocalBuffer;
@@ -109,7 +118,7 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
         vocalSrc.connect(vocalGain);
         vocalGain.connect(ctx.destination);
         vocalSrc.start(ctx.currentTime);
-        (ctx as unknown as Record<string, unknown>)._vocalSrc = vocalSrc;
+        session.vocalSrc = vocalSrc;
       }
 
       if (useMonitor) {
@@ -171,10 +180,10 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
     if (!mediaRecorderRef.current || !isRecording) return;
     mediaRecorderRef.current.stop();
     setIsRecording(false);
-    const ctx = audioCtxRef.current as unknown as Record<string, { stop?: () => void }> | null;
-    if (ctx) {
-      try { ctx._beatSrc?.stop?.(); } catch { /* already stopped */ }
-      try { ctx._vocalSrc?.stop?.(); } catch { /* already stopped */ }
+    const session = sessionRef.current;
+    if (session) {
+      try { session.beatSrc?.stop(); } catch { /* already stopped */ }
+      try { session.vocalSrc?.stop(); } catch { /* already stopped */ }
     }
   };
 
@@ -255,7 +264,7 @@ export function RecordStep({ canvasRef, onRecordingComplete }: RecordStepProps) 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             onClick={() => setShowLyrics(true)}
-            className="mt-4 flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] uppercase tracking-widest text-white/60 hover:bg-white/10 transition-colors"
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-full text-[10px] uppercase tracking-widest text-white/60 hover:bg-white/10 transition-colors mx-auto"
           >
             <FileText className="w-3 h-3" /> Show Teleprompter
           </motion.button>

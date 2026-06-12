@@ -13,6 +13,7 @@ interface ProSliderProps {
   glowClass?: string;
 }
 
+/** Horizontal slider with animated fill + glowing thumb. */
 export function ProSlider({
   label,
   icon: Icon,

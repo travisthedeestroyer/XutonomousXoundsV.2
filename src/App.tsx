@@ -1,45 +1,75 @@
-import React, { useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Key, Sparkles, Settings2, TreePine, Layers } from 'lucide-react';
-import { useStudioStore } from './store/useStudioStore';
-import { mixAudio } from './lib/audioUtils';
-import { runAIAgentNetwork } from './lib/aiMixer';
-import { getSkillTreeStats, loadSkillTree } from './lib/agentMemory';
+import { Sparkles, Settings2, TreePine, Layers } from 'lucide-react';
+import { useStudioStore } from '@/state/store';
+import { mixAudio, defaultMixSettings, type MixSettings } from '@/audio';
+import { runAIAgentNetwork, getSkillTreeStats, loadSkillTree } from '@/ai';
 
 import { UploadStep } from './components/steps/UploadStep';
 import { PrepareStep } from './components/steps/PrepareStep';
 import { RecordStep } from './components/steps/RecordStep';
+import { ResultStep } from './components/steps/ResultStep';
 import { MixingConsole } from './components/MixingConsole';
 import { AIAgentPanel } from './components/AIAgentPanel';
-import { ResultStep } from './components/steps/ResultStep';
-import { TutorialModal } from './components/TutorialModal';
-import { SettingsModal } from './components/SettingsModal';
-import { SkillLibrary } from './components/SkillLibrary';
+import { TutorialModal } from './components/modals/TutorialModal';
+import { SettingsModal } from './components/modals/SettingsModal';
+import { SkillLibrary } from './components/modals/SkillLibrary';
+
+// Bypass settings used to render the dry comparison mix for A/B playback
+const RAW_MIX_SETTINGS: MixSettings = {
+  ...defaultMixSettings,
+  vocalEQ: { lowCutFreq: 20, lowMidFreq: 300, lowMidGain: 0, lowMidQ: 1, highMidFreq: 2000, highMidGain: 0, highMidQ: 1, presenceFreq: 4000, presenceGain: 0, presenceQ: 1, airFreq: 10000, airGain: 0 },
+  deEsser: { enabled: false, frequency: 6500, threshold: -10, ratio: 1 },
+  vocalCompressor: { threshold: 0, ratio: 1, attack: 0.05, release: 0.3, knee: 0 },
+  multibandVocalComp: {
+    low:     { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+    lowMid:  { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+    highMid: { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+    high:    { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+  },
+  parallelCompression: { enabled: false, wetDry: 0, threshold: -40, ratio: 1, attack: 0.05, release: 0.3 },
+  saturation: 0,
+  saturationDrive: 0,
+  reverb: 0,
+  echo: 0,
+  doubler: 0,
+  beatEQ: { lowFreq: 80, lowGain: 0, lowMidFreq: 400, lowMidGain: 0, highMidFreq: 3000, highMidGain: 0, highFreq: 8000, highGain: 0 },
+  beatCompressor: { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+  sidechainDuck: 0,
+  stereoImaging: { width: 1.0, bassMonoCutoff: 0 },
+  masterMultiband: {
+    low:  { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+    mid:  { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+    high: { threshold: 0, ratio: 1, attack: 0.05, release: 0.3 },
+  },
+  masterEQ: { lowShelfFreq: 100, lowShelfGain: 0, midFreq: 2000, midGain: 0, midQ: 1, highShelfFreq: 10000, highShelfGain: 0 },
+  softClipAmount: 0,
+  masterGain: 1.0,
+  lufsTarget: -14,
+};
 
 const stepArray = ['upload', 'prepare', 'record', 'mix', 'result'] as const;
 const stepNames = { upload: 'Upload', prepare: 'Prepare', record: 'Record', mix: 'Mix', result: 'Master' };
 
-
 export default function App() {
   const {
     step, setStep,
-    hasApiKey, savedApiKey, setHasApiKey,
+    setHasApiKey,
     isMobile, setIsMobile, isSmallMobile, setIsSmallMobile,
     mobileMixPanel, setMobileMixPanel,
-    showSettings, setShowSettings,
-    showTutorial, setShowTutorial, tutorialStep, setTutorialStep,
-    showSkillLibrary, setShowSkillLibrary,
-    originalBeatBlob, beatBlob, vocalBlob, mixedBlob,
+    setShowSettings,
+    setShowTutorial,
+    setShowSkillLibrary,
+    originalBeatBlob, beatBlob, vocalBlob, mixedBlob, backupVocalBlob,
     isRecording, isProcessing, isAiMixing,
-    settings,
-    vocalBlob: vocal, beatBlob: beat, backupVocalBlob,
+    settings, setSettings,
     aiIterations,
     appendAiLog, setAiLogs, setAiReasoning,
     setIsAiMixing, setActiveAgentPhase,
-    setSettings,
     setMixedBlob, setMixedUrl, mixedUrl, addToHistory,
+    setRawMixUrl, rawMixUrl,
     setIsProcessing,
-    isMastering, setIsMastering, setMasteringJobId, setMasteredUrl,
+    setIsMastering, setMasteringJobId, setMasteredUrl,
     referenceBlob,
     setLastSessionResult, setSkillFeedbackState,
     setSkillTreeStats,
@@ -65,43 +95,38 @@ export default function App() {
   // Load persisted data on mount
   useEffect(() => {
     const stored = localStorage.getItem('gemini_api_key');
-    if (stored) { setSavedApiKey(stored); setManualApiKey(stored); }
+    if (stored) { setSavedApiKey(stored); setManualApiKey(stored); setHasApiKey(true); }
+    else if (process.env.GEMINI_API_KEY) { setHasApiKey(true); }
     if (!localStorage.getItem('tutorial_seen')) setShowTutorial(true);
     const tree = loadSkillTree();
     if (tree.preferences.notesForAgents) setAgentNotesText(tree.preferences.notesForAgents);
     setSkillTreeStats(getSkillTreeStats());
-  }, [setSavedApiKey, setManualApiKey, setShowTutorial, setAgentNotesText, setSkillTreeStats]);
+  }, [setSavedApiKey, setManualApiKey, setHasApiKey, setShowTutorial, setAgentNotesText, setSkillTreeStats]);
 
   // Cleanup mastering poll on unmount
   useEffect(() => () => { if (masteringPollRef.current) clearInterval(masteringPollRef.current); }, []);
 
-  // Decode vocal blob into AudioBuffer so backup mode can play it during recording
+  // Decode the main vocal so backup mode can play it during recording
   useEffect(() => {
-    if (!vocal) return;
+    if (!vocalBlob) return;
     const AudioContextClass = (window as unknown as Record<string, unknown>).AudioContext as typeof AudioContext;
     const ctx = new AudioContextClass();
-    vocal.arrayBuffer().then((buf) => ctx.decodeAudioData(buf)).then((ab) => {
+    vocalBlob.arrayBuffer().then((buf) => ctx.decodeAudioData(buf)).then((ab) => {
       setMainVocalBuffer(ab);
       ctx.close();
     }).catch(() => ctx.close());
-  }, [vocal, setMainVocalBuffer]);
+  }, [vocalBlob, setMainVocalBuffer]);
 
-  const handleSelectKey = async () => {
-    const aistudio = (window as unknown as Record<string, unknown>).aistudio as Record<string, () => Promise<void>> | undefined;
-    if (aistudio?.openSelectKey) {
-      try { await aistudio.openSelectKey(); setHasApiKey(true); } catch { setHasApiKey(false); }
-    }
-  };
-
+  // Run the multi-agent network (Gemini, or deterministic DSP fallback)
   const handleAutoMix = async () => {
-    if (!vocal || !beat) return;
+    if (!vocalBlob || !beatBlob) return;
     setIsAiMixing(true);
     setAiLogs([]);
     setActiveAgentPhase(null);
     setLastSessionResult(null);
     setSkillFeedbackState('pending');
     try {
-      const result = await runAIAgentNetwork(vocal, beat, backupVocalBlob, aiIterations, (log) => {
+      const result = await runAIAgentNetwork(vocalBlob, beatBlob, backupVocalBlob, aiIterations, (log) => {
         appendAiLog(log);
         if (log.phase) setActiveAgentPhase(log.phase);
       });
@@ -117,7 +142,7 @@ export default function App() {
       });
       appendAiLog({
         agent: 'System',
-        message: 'AI Agent Network has successfully configured your mix settings.',
+        message: `AI Agent Network configured your mix settings — objective mix score ${result.finalScore}/100.`,
         details: result.matchedSkillId
           ? '✨ Session warm-started from Skill Tree — refined for your tracks.'
           : 'Rate this mix after processing to grow your Skill Tree.',
@@ -134,15 +159,22 @@ export default function App() {
     }
   };
 
+  // Render the final mix plus a raw comparison mix for A/B playback
   const handleProcess = async () => {
-    if (!vocal || !beat) return;
+    if (!vocalBlob || !beatBlob) return;
     setIsProcessing(true);
     try {
-      const resultBlob = await mixAudio(vocal, beat, backupVocalBlob, settings);
+      const [resultBlob, rawBlob] = await Promise.all([
+        mixAudio(vocalBlob, beatBlob, backupVocalBlob, settings),
+        mixAudio(vocalBlob, beatBlob, backupVocalBlob, RAW_MIX_SETTINGS),
+      ]);
       if (mixedUrl) URL.revokeObjectURL(mixedUrl);
+      if (rawMixUrl) URL.revokeObjectURL(rawMixUrl);
       const url = URL.createObjectURL(resultBlob);
+      const rawUrl = URL.createObjectURL(rawBlob);
       setMixedBlob(resultBlob);
       setMixedUrl(url);
+      setRawMixUrl(rawUrl);
       addToHistory(url);
       setStep('result');
     } catch (err) {
@@ -153,6 +185,7 @@ export default function App() {
     }
   };
 
+  // Reference mastering via the server with status polling
   const handleMastering = async () => {
     if (!mixedBlob || !referenceBlob) return;
     setIsMastering(true);
@@ -193,18 +226,20 @@ export default function App() {
     }
   };
 
+  // Step navigation gating — each step requires its prerequisites
+  const canNavigateTo = (s: typeof stepArray[number]) =>
+    s === 'upload' ? true :
+    s === 'prepare' ? !!originalBeatBlob :
+    s === 'record' ? !!beatBlob :
+    s === 'mix' ? !!vocalBlob && !!beatBlob :
+    s === 'result' ? !!mixedBlob : false;
+
   const handleStepSwipe = (direction: -1 | 1) => {
     const currentIndex = stepArray.indexOf(step as typeof stepArray[number]);
     let newIndex = currentIndex + direction;
     while (newIndex >= 0 && newIndex < stepArray.length) {
       const s = stepArray[newIndex];
-      const canNav =
-        s === 'upload' ? true :
-        s === 'prepare' ? !!originalBeatBlob :
-        s === 'record' ? !!beatBlob :
-        s === 'mix' ? !!vocalBlob && !!beatBlob :
-        s === 'result' ? !!mixedBlob : false;
-      if (canNav) { setStep(s); break; }
+      if (canNavigateTo(s)) { setStep(s); break; }
       newIndex += direction;
     }
   };
@@ -222,28 +257,9 @@ export default function App() {
 
   return (
     <>
-      {/* API key gate */}
-      {!hasApiKey && !savedApiKey && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-white/10 p-8 rounded-3xl max-w-md w-full shadow-2xl flex flex-col items-center text-center">
-            <Sparkles className="w-12 h-12 text-amber-400 mb-6" />
-            <h2 className="text-2xl font-bold text-white mb-4">API Key Required</h2>
-            <p className="text-zinc-400 mb-6 leading-relaxed">To use the AI-powered mixing and mastering features, provide a Gemini API key.</p>
-            <div className="w-full flex flex-col gap-3">
-              <button onClick={handleSelectKey} className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors uppercase tracking-widest text-sm">Select via AI Studio</button>
-              <button onClick={() => setShowSettings(true)} className="w-full py-3 bg-white/5 border border-white/10 text-white/70 font-bold rounded-xl hover:bg-white/10 transition-colors uppercase tracking-widest text-sm flex items-center justify-center gap-2">
-                <Key className="w-4 h-4" /> Enter Key Manually
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <TutorialModal />
       <SettingsModal />
       <SkillLibrary />
-
-      {/* Lyrics teleprompter overlay */}
       <LyricsOverlay />
 
       <div className="min-h-screen bg-black text-white overflow-hidden relative">
@@ -345,7 +361,7 @@ export default function App() {
           </AnimatePresence>
         </motion.main>
 
-        {/* Infinity Wheel Step Navigation */}
+        {/* Infinity wheel step navigation */}
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 w-full max-w-3xl px-6 pointer-events-none">
           <div className="relative flex items-center justify-center bg-black/40 backdrop-blur-2xl border border-white/10 rounded-full h-24 shadow-2xl overflow-hidden pointer-events-auto" style={{ perspective: '1200px' }}>
             <motion.div
@@ -365,12 +381,7 @@ export default function App() {
                   const currentIndex = stepArray.indexOf(step as typeof stepArray[number]);
                   const offset = i - currentIndex;
                   const distance = Math.abs(offset);
-                  const canNav =
-                    s === 'upload' ? true :
-                    s === 'prepare' ? !!originalBeatBlob :
-                    s === 'record' ? !!beatBlob :
-                    s === 'mix' ? !!vocalBlob && !!beatBlob :
-                    s === 'result' ? !!mixedBlob : false;
+                  const canNav = canNavigateTo(s);
                   return (
                     <motion.button
                       key={s}
@@ -401,6 +412,7 @@ export default function App() {
   );
 }
 
+/** Auto-scrolling lyrics teleprompter shown while recording. */
 function LyricsOverlay() {
   const { showLyrics, setShowLyrics, lyrics, isRecording } = useStudioStore();
   const scrollRef = useRef<HTMLDivElement>(null);

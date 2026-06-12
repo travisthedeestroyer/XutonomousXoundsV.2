@@ -1,4 +1,4 @@
-import type { ConfidenceLevel } from '../../lib/aiMixer';
+import type { ConfidenceLevel } from '@/ai';
 
 const cfg: Record<ConfidenceLevel, { color: string; bg: string; border: string; dot: string }> = {
   high:   { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', dot: 'bg-emerald-400' },
@@ -6,6 +6,7 @@ const cfg: Record<ConfidenceLevel, { color: string; bg: string; border: string; 
   low:    { color: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/30',     dot: 'bg-red-400'     },
 };
 
+/** Small pill indicating agent confidence. */
 export function ConfidenceBadge({ level }: { level: ConfidenceLevel }) {
   const c = cfg[level];
   return (
